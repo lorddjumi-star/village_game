@@ -1,0 +1,625 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Симулятор Жизни | Telegram WebApp</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0b0e14;
+      --bg-card: rgba(22, 28, 42, 0.75);
+      --bg-card-border: rgba(255, 255, 255, 0.08);
+      --accent-gold: #f59e0b;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --transition-fast: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding-bottom: 90px;
+    }
+
+    /* Анимации вкладок */
+    .tab-content {
+      display: none;
+      padding: 16px;
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+      transition: opacity var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .tab-content.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Шапка игрока */
+    .header-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+      border: 1px solid var(--bg-card-border);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin: 12px 16px 4px 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, var(--accent-purple), var(--accent-blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 20px;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .stat-bar-container {
+      background: rgba(0,0,0,0.3);
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .progress-bg {
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    /* Карточки функционала */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-main);
+    }
+
+    /* Кнопки */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, opacity 0.2s;
+
+
+background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+      color: white;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+
+    .btn-gold { background: linear-gradient(135deg, var(--accent-gold), #d97706); color: black; }
+    .btn-green { background: linear-gradient(135deg, var(--accent-green), #059669); }
+    .btn-red { background: linear-gradient(135deg, var(--accent-red), #dc2626); }
+    .btn-purple { background: linear-gradient(135deg, var(--accent-purple), #7c3aed); }
+
+    /* Ниже Нижняя навигация с кнопкой "..." по центру */
+    .navbar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 70px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--bg-card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 8px;
+      z-index: 1000;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      flex: 1;
+      transition: color 0.2s;
+    }
+
+    .nav-item.active {
+      color: var(--accent-gold);
+    }
+
+    .nav-item-center {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-gold), #d97706);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: black;
+      font-size: 22px;
+      font-weight: bold;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+      transform: translateY(-12px);
+      border: 3px solid var(--bg-primary);
+    }
+
+    /* Модальное окно донатов */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--bg-primary);
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      width: 100%;
+      max-width: 500px;
+      padding: 24px;
+      border: 1px solid var(--bg-card-border);
+      max-height: 85vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .donate-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .donate-item {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      text-align: center;
+    }
+
+    .price-tag {
+      color: var(--accent-gold);
+      font-weight: bold;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Верхняя карточка с параметрами -->
+  <div class="header-card">
+    <div class="user-profile">
+      <div class="avatar" id="userAvatar">S</div>
+      <div>
+        <div style="font-weight: bold; font-size: 16px;" id="userName">Игрок</div>
+        <div style="font-size: 12px; color: var(--accent-gold);" id="userBalance">💰 1 000 ₽</div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-bar-container">
+        <div class="stat-header"><span>❤️ Здоровье</span><span id="hpVal">100%</span></div>
+        <div class="progress-bg"><div class="progress-fill" id="hpBar" style="width:100%; background:var(--accent-red);"></div></div>
+      </div>
+      <div class="stat-bar-container">
+        <div class="stat-header"><span>🍗 Голод</span><span id="hungerVal">100%</span></div>
+        <div class="progress-bg"><div class="progress-fill" id="hungerBar" style="width:100%; background:var(--accent-gold);"></div></div>
+      </div>
+      <div class="stat-bar-container">
+<div class="stat-header"><span>⚡ Энергия</span><span id="energyVal">100%</span></div>
+        <div class="progress-bg"><div class="progress-fill" id="energyBar" style="width:100%; background:var(--accent-blue);"></div></div>
+      </div>
+      <div class="stat-bar-container">
+        <div class="stat-header"><span>🍷 Зависимость</span><span id="alcVal">0%</span></div>
+        <div class="progress-bg"><div class="progress-fill" id="alcBar" style="width:0%; background:var(--accent-purple);"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Вкладки -->
+
+  <!-- 1. Жизнь -->
+  <div id="tab-life" class="tab-content active">
+    <div class="card">
+      <div class="card-title">👨‍💼 Персонаж <span id="ageVal">18 лет</span></div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;" id="lifeStatus">Вы начинаете свой путь. Работайте, копите и строите жизнь.</p>
+      <button class="btn btn-green" onclick="work() font-size:14px;">💼 Подрабатывать (+500 ₽, -10% Энергия)</button>
+      <button class="btn btn-gold" style="margin-top: 8px;" onclick="eat()">🍕 Покушать (-300 ₽, +30% Голод)</button>
+      <button class="btn btn-purple" style="margin-top: 8px;" onclick="drink()">🍺 Выпить 100g (-200 ₽, +Зависимость)</button>
+      <button class="btn" style="margin-top: 8px;" onclick="sleep()">🛌 Поспать (+100% Энергия, +1 Год)</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏥 Больница & Клиника</div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Восстановление здоровья и лечение от алкоголизма.</p>
+      <button class="btn btn-red" onclick="heal()">💊 Подлечиться (-1 500 ₽)</button>
+      <button class="btn btn-purple" style="margin-top: 8px;" onclick="rehab()">🩺 Капельница / Реабилитация (-5 000 ₽)</button>
+    </div>
+  </div>
+
+  <!-- 2. Казино & Кейсы -->
+  <div id="tab-casino" class="tab-content">
+    <div class="card">
+      <div class="card-title">🎰 Слоты (Жесткая экономика)</div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Шанс выигрыша реалистично низкий.</p>
+      <button class="btn btn-gold" onclick="spinSlots(500)">Крутить за 500 ₽</button>
+      <button class="btn btn-gold" style="margin-top: 8px;" onclick="spinSlots(2000)">Крутить за 2 000 ₽</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📦 Кейсы & Лутбоксы</div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">В 85% случаев окуп меньше стоимости кейса в 3-5 раз!</p>
+      <button class="btn btn-purple" onclick="openCase(1000)">Кейс «Новичок» (1 000 ₽)</button>
+      <button class="btn btn-purple" style="margin-top: 8px;" onclick="openCase(10000)">Кейс «Мажор» (10 000 ₽)</button>
+    </div>
+  </div>
+
+  <!-- 3. Банк & Тень -->
+  <div id="tab-bank" class="tab-content">
+    <div class="card">
+      <div class="card-title">🏦 Банк & Кредиты</div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Берете кредит? Не забудьте вернуть, иначе придут коллекторы!</p>
+      <button class="btn btn-green" onclick="takeLoan(10000)">Взять кредит 10 000 ₽</button>
+      <button class="btn btn-red" style="margin-top: 8px;" onclick="payLoan()">Выплатить долг</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🕵️‍♂️ Криминал & Тень</div>
+      <button class="btn btn-red" onclick="crimeWork()">🥷 Угон авто / Темные дела (Риск!)</button>
+    </div>
+  </div>
+
+  <!-- 4. Медиа & Блог -->
+  <div id="tab-media" class="tab-content">
+    <div class="card">
+      <div class="card-title">📹 Блогерство & Стримы</div>
+      <div style="font-size: 13px; margin-bottom: 10px;" id="subsCount">Подписчики: 0</div>
+      <button class="btn btn-purple" onclick="startStream()">🎥 Провести прямой эфир</button>
+    </div>
+  </div>
+
+  <!-- Нижнее меню навигации -->
+  <div class="navbar">
+    <div class="nav-item active" onclick="switchTab('life', this)">
+      <span>🏠</span>
+
+<span>Жизнь</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('casino', this)">
+      <span>🎰</span>
+      <span>Казино</span>
+    </div>
+    <div class="nav-item-center" onclick="openDonateModal()">...</div>
+    <div class="nav-item" onclick="switchTab('bank', this)">
+      <span>🏦</span>
+      <span>Банк</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('media', this)">
+      <span>📹</span>
+      <span>Медиа</span>
+    </div>
+  </div>
+
+  <!-- Модальное окно донатов (Три точки) -->
+  <div class="modal-overlay" id="donateModal" onclick="closeDonateModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div style="display:flex; justify-shadow:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="font-size:18px;">⭐ Магазин Донатов (Telegram Stars)</h3>
+        <span style="font-size:20px; cursor:pointer;" onclick="closeDonateModal()">✕</span>
+      </div>
+
+      <p style="font-size:12px; color:var(--text-muted);">Покупка игровой валюты и бонусов за Telegram Stars:</p>
+
+      <div class="donate-grid">
+        <div class="donate-item">
+          <div style="font-weight:bold;">10 000 ₽</div>
+          <div class="price-tag">⭐ 50 Stars</div>
+          <button class="btn btn-gold" style="margin-top:8px; padding:6px;" onclick="buyDonate(50, 10000)">Купить</button>
+        </div>
+        <div class="donate-item">
+          <div style="font-weight:bold;">100 000 ₽</div>
+          <div class="price-tag">⭐ 350 Stars</div>
+          <button class="btn btn-gold" style="margin-top:8px; padding:6px;" onclick="buyDonate(350, 100000)">Купить</button>
+        </div>
+        <div class="donate-item">
+          <div style="font-weight:bold;">Снять зависимость</div>
+          <div class="price-tag">⭐ 100 Stars</div>
+          <button class="btn btn-purple" style="margin-top:8px; padding:6px;" onclick="clearAddictionDonate()">Снять</button>
+        </div>
+        <div class="donate-item">
+          <div style="font-weight:bold;">VIP Статус</div>
+          <div class="price-tag">⭐ 500 Stars</div>
+          <button class="btn btn-green" style="margin-top:8px; padding:6px;" onclick="buyVIP()">Активировать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Инициализация Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    // Состояние игрока
+    let state = {
+      balance: 1000,
+      hp: 100,
+      hunger: 100,
+      energy: 100,
+      alc: 0,
+      age: 18,
+      loan: 0,
+      subs: 0
+    };
+
+    // Загрузка данных пользователя Telegram
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+      const u = tg.initDataUnsafe.user;
+      document.getElementById('userName').innerText = u.first_name + (u.last_name ? ' ' + u.last_name : '');
+      document.getElementById('userAvatar').innerText = u.first_name ? u.first_name[0] : 'U';
+    }
+
+    function updateUI() {
+      document.getElementById('userBalance').innerText = '💰 ' + state.balance.toLocaleString() + ' ₽';
+      document.getElementById('hpVal').innerText = state.hp + '%';
+      document.getElementById('hpBar').style.width = state.hp + '%';
+      document.getElementById('hungerVal').innerText = state.hunger + '%';
+      document.getElementById('hungerBar').style.width = state.hunger + '%';
+      document.getElementById('energyVal').innerText = state.energy + '%';
+      document.getElementById('energyBar').style.width = state.energy + '%';
+      document.getElementById('alcVal').innerText = state.alc + '%';
+      document.getElementById('alcBar').style.width = state.alc + '%';
+      document.getElementById('ageVal').innerText = state.age + ' лет';
+      document.getElementById('subsCount').innerText = 'Подписчики: ' + state.subs.toLocaleString();
+    }
+
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      if (el) el.classList.add('active');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    }
+
+    function openDonateModal() {
+      document.getElementById('donateModal').classList.add('active');
+    }
+
+    function closeDonateModal(e) {
+      document.getElementById('donateModal').classList.remove('active');
+    }
+
+    /* Игровые механики */
+    function work() {
+      if (state.energy < 10) return alert('Вы слишком устали!');
+      state.balance += 500;
+      state.energy -= 10;
+      state.hunger -= 5;
+      updateUI();
+    }
+
+    function eat() {
+      if (state.balance < 300) return alert('Недостаточно денег!');
+      state.balance -= 300;
+      state.hunger = Math.min(100, state.hunger + 30);
+      updateUI();
+    }
+
+    function drink() {
+      if (state.balance < 200) return alert('Недостаточно денег!');
+      state.balance -= 200;
+      state.alc = Math.min(100, state.alc + 15);
+      state.energy = Math.min(100, state.energy + 10);
+      updateUI();
+    }
+
+    function sleep() {
+      state.energy = 100;
+      state.age += 1;
+      state.hunger -= 20;
+      if (state.alc > 0) state.alc -= 10;
+      updateUI();
+    }
+
+    function heal() {
+      if (state.balance < 1500) return alert('Недостаточно денег!');
+      state.balance -= 1500;
+      state.hp = 100;
+      updateUI();
+    }
+
+    function rehab() {
+      if (state.balance < 5000) return alert('Недостаточно денег!');
+      state.balance -= 5000;
+      state.alc = 0;
+      updateUI();
+    }
+
+    /* Казино & Жесткие кейсы */
+    function spinSlots(cost) {
+      if (state.balance < cost) return alert('Недостаточно средств!');
+      state.balance -= cost;
+      let rand = Math.random();
+      if (rand < 0.05) { // 5% шанс на выигрыш
+        let win = cost * 3;
+        state.balance += win;
+        alert('🎉 ВЫИГРЫШ: ' + win + ' ₽!');
+      } else {
+        alert('❌ Проигрыш! Повезет в следующий раз.');
+      }
+      updateUI();
+    }
+
+    function openCase(cost) {
+      if (state.balance < cost) return alert('Недостаточно средств!');
+      state.balance -= cost;
+      let rand = Math.random();
+      let win = 0;
+      if (rand < 0.85) {
+        // 85% шанс окупа в 3-5 раз МЕНЬШЕ стоимости
+        win = Math.floor(cost * (0.1 + Math.random() * 0.2));
+      } else {
+        win = Math.floor(cost * 1.5);
+      }
+      state.balance += win;
+      alert('📦 Вы выбили: ' + win + ' ₽');
+      updateUI();
+    }
+
+    /* Банк & Донаты */
+    function takeLoan(amount) {
+      state.balance += amount;
+      state.loan += amount * 1.2;
+      updateUI();
+    }
+
+    function payLoan() {
+      if (state.balance < state.loan) return alert('Нехватка средств для погашения!');
+      state.balance -= state.loan;
+      state.loan = 0;
+      updateUI();
+    }
+
+    function crimeWork() {
+      if (Math.random() < 0.4) {
+        state.balance += 5000;
+        alert('😎 Ограбление прошло успешно! +5 000 ₽');
+      } else {
+        state.balance = Math.max(0, state.balance - 2000);
+        state.hp -= 30;
+        alert('🚨 Вас поймала полиция! Штраф и травмы.');
+      }
+      updateUI();
+    }
+
+    function startStream() {
+      let earned = Math.floor(Math.random() * 1000) + (state.subs * 2);
+      state.subs += Math.floor(Math.random() * 50);
+      state.balance += earned;
+      alert('🎥 Стрим завершен! Получено донатов: ' + earned + ' ₽');
+      updateUI();
+    }
+
+    function buyDonate(stars, rub) {
+      if (tg && tg.openInvoice) {
+        alert('Запрос на оплату ' + stars + ' Stars');
+      } else {
+        state.balance += rub;
+        alert('Донат зачислен: +' + rub + ' ₽!');
+        updateUI();
+      }
+    }
+
+    function clearAddictionDonate() {
+      state.alc = 0;
+      alert('Зависимость полностью снята!');
+      updateUI();
+    }
+
+    function buyVIP() {
+
+alert('VIP Статус успешно активирован!');
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
